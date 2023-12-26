@@ -1,4 +1,10 @@
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Extension, Json, Router};
+use axum::{
+    extract::Path,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json, Router,
+};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Row};
@@ -16,7 +22,8 @@ async fn main() {
         .route("/health", get(|| async { StatusCode::OK }))
         .route("/testdb", get(test_db_connect))
         .route("/testdbticket", get(test_db_connect_ticket))
-        .route("/testdbticketout", get(get_data_ticket))
+        .route("/dataticket/:user_id", post(data_ticket))
+        .route("/dataticketone/:user_id", get(data_ticket_one))
         .layer(Extension(pool));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -71,16 +78,23 @@ async fn test_db_connect_ticket(
     StatusCode::OK
 }
 
-async fn get_data_ticket(Extension(pool): Extension<PgPool>) -> impl IntoResponse {
+async fn data_ticket(
+    Extension(pool): Extension<PgPool>,
+    Path(user_id): Path<u32>,
+) -> impl IntoResponse {
     let select_query = sqlx::query_as::<_, Ticket>("SELECT id, name FROM ticket");
     let tickets: Vec<Ticket> = select_query
         .fetch_all(&pool)
         .await
         .expect("Failed to fetch data from the database");
-    tickets.get(0).unwrap().name.to_owned()
+    tickets.get(user_id as usize).unwrap().name.to_owned()
 }
 
-async fn degug_app(Extension(pool): Extension<PgPool>) -> impl IntoResponse {}
+async fn data_ticket_one(
+    Extension(pool): Extension<PgPool>,
+    Path(user_id): Path<u32>,
+) -> impl IntoResponse {
+}
 
 // StatusCode::OK
 
