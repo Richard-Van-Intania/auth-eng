@@ -1,28 +1,35 @@
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use axum::{http::StatusCode, response::IntoResponse, routing::get, Extension, Json, Router};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, FromRow, Row};
+use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Row};
 
 const DB_URL: &'static str = "postgres://postgres:mysecretpassword@localhost/testuser";
 
 #[tokio::main]
 async fn main() {
+    let pool = PgPool::connect(DB_URL)
+        .await
+        .expect("Failed to connect to database");
+
+    // let pool = PgPoolOptions::new()
+    //     .max_connections(5)
+    //     .connect(DB_URL)
+    //     .await
+    //     .expect("Failed to connect to database");
+    //
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/health", get(|| async { StatusCode::OK }))
         .route("/testdb", get(test_db_connect))
-        .route("/testdbticket", get(test_db_connect_ticket));
+        .route("/testdbticket", get(test_db_connect_ticket))
+        .route("/testdbticketout", get(get_data_ticket))
+        .layer(Extension(pool));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn test_db_connect() -> impl IntoResponse {
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(DB_URL)
-        .await
-        .unwrap();
+async fn test_db_connect(Extension(pool): Extension<PgPool>) -> impl IntoResponse {
     let rows = sqlx::query("SELECT * FROM public.users")
         .execute(&pool)
         .await
@@ -31,13 +38,10 @@ async fn test_db_connect() -> impl IntoResponse {
     local.to_string()
 }
 
-async fn test_db_connect_ticket(Json(payload): Json<Ticket>) -> impl IntoResponse {
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(DB_URL)
-        .await
-        .unwrap();
-    //
+async fn test_db_connect_ticket(
+    Extension(pool): Extension<PgPool>,
+    Json(payload): Json<Ticket>,
+) -> impl IntoResponse {
     sqlx::query(
         r#"
     CREATE TABLE IF NOT EXISTS ticket (
@@ -73,6 +77,15 @@ async fn test_db_connect_ticket(Json(payload): Json<Ticket>) -> impl IntoRespons
     StatusCode::OK
 }
 
+async fn get_data_ticket(Extension(pool): Extension<PgPool>) -> impl IntoResponse {
+    let select_query = sqlx::query_as::<_, Ticket>("SELECT id, name FROM ticket");
+    let tickets: Vec<Ticket> = select_query
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to fetch data from the database");
+    tickets.get(0).unwrap().name.to_owned()
+}
+
 // StatusCode::OK
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
@@ -80,3 +93,10 @@ struct Ticket {
     id: i64,
     name: String,
 }
+
+// let pool = PgPoolOptions::new()
+// .max_connections(5)
+// .connect(DB_URL)
+// .await
+// .unwrap();
+// //
