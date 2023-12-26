@@ -1,22 +1,16 @@
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Extension, Json, Router};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Row};
+use sqlx::{FromRow, PgPool, Row};
 
-const DB_URL: &'static str = "postgres://postgres:mysecretpassword@localhost/testuser";
+const DATABASE_URL: &'static str = "postgres://postgres:mysecretpassword@localhost/testuser";
 
 #[tokio::main]
 async fn main() {
-    let pool = PgPool::connect(DB_URL)
+    let pool = PgPool::connect(DATABASE_URL)
         .await
         .expect("Failed to connect to database");
 
-    // let pool = PgPoolOptions::new()
-    //     .max_connections(5)
-    //     .connect(DB_URL)
-    //     .await
-    //     .expect("Failed to connect to database");
-    //
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/health", get(|| async { StatusCode::OK }))
@@ -86,6 +80,8 @@ async fn get_data_ticket(Extension(pool): Extension<PgPool>) -> impl IntoRespons
     tickets.get(0).unwrap().name.to_owned()
 }
 
+async fn degug_app(Extension(pool): Extension<PgPool>) -> impl IntoResponse {}
+
 // StatusCode::OK
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
@@ -93,10 +89,3 @@ struct Ticket {
     id: i64,
     name: String,
 }
-
-// let pool = PgPoolOptions::new()
-// .max_connections(5)
-// .connect(DB_URL)
-// .await
-// .unwrap();
-// //

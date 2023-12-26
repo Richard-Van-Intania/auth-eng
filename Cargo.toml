@@ -24,3 +24,4 @@ sqlx = { version = "0.7.3", features = [
     "macros",
     "tls-rustls",
 ] }
+jsonwebtoken = "9.2.0"
