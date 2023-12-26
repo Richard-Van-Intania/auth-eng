@@ -1,0 +1,20 @@
+[package]
+name = "auth-eng"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.35.1", features = ["full"] }
+axum = { version = "0.7.2", features = [
+    "macros",
+    "http2",
+    "multipart",
+    "tracing",
+    "ws",
+] }
+tower = { version = "0.4.13", features = ["full"] }
+serde = { version = "1.0.193", features = ["derive"] }
+chrono = "0.4.31"
+uuid = { version = "1.6.1", features = ["v4"] }
