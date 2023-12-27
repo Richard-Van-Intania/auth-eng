@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 
 use axum::{
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Extension, Json, Router,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
 };
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
@@ -13,6 +17,7 @@ use sqlx::{FromRow, PgPool, Row};
 
 const DATABASE_URL: &'static str =
     "postgres://postgres:mysecretpassword@localhost:5432/app789plates";
+const MAX_CONNECTION: usize = 80;
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +27,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .route("/health", get(|| async { StatusCode::OK }))
+        .route("/health", get(|| async {}))
         .route("/testdb", get(test_db_connect))
         .route("/testdbticket", get(test_db_connect_ticket))
         .route("/dataticket/:user_id", post(data_ticket))
@@ -30,7 +35,11 @@ async fn main() {
         .route("/testjson", get(test_json))
         .route("/testquery", get(test_query))
         .route("/testpath/:user_id", get(test_path))
-        .layer(Extension(pool));
+        .route("/foo", get(get_foo).post(post_foo))
+        .route("/testusingstate", get(get_testusingstate))
+        .route("/api/:version/users/:id/action", delete(do_users_action))
+        .with_state(pool); // You should prefer using State if possible since it’s more type safe
+                           // .layer(Extension(pool));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -107,7 +116,7 @@ async fn data_ticket_one(
     //     .expect("Failed to fetch data from the database");
     // ticket.name
 }
-async fn test_path(Path(user_id): Path<u32>) -> String {
+async fn test_path(Path(user_id): Path<usize>) -> String {
     user_id.to_string()
 }
 
@@ -121,6 +130,25 @@ async fn test_json() -> Json<Ticket> {
         name: "mytest".to_string(),
     })
 }
+
+async fn get_foo() {}
+async fn post_foo() {}
+
+async fn get_testusingstate(State(pool): State<PgPool>) -> String {
+    let rows = sqlx::query("SELECT * FROM public.users")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let local: DateTime<Local> = Local::now();
+    local.to_string()
+}
+
+async fn authenticated_handler(
+    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+) -> impl IntoResponse {
+}
+
+async fn do_users_action(Path((version, id)): Path<(String, usize)>) {}
 
 // StatusCode::OK
 

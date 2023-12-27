@@ -14,6 +14,7 @@ axum = { version = "0.7.2", features = [
     "tracing",
     "ws",
 ] }
+axum-extra = { version = "0.9.0", features = ["typed-header"] }
 tower = { version = "0.4.13", features = ["full"] }
 serde = { version = "1.0.193", features = ["derive"] }
 chrono = "0.4.31"
