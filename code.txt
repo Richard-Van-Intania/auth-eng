@@ -6,3 +6,11 @@
 
 
     TL;DR: Best practice for RESTful API design is that path params are used to identify a specific resource or resources, while query parameters are used to sort/filter those resources.
+
+axum allows you to add middleware just about anywhere
+
+To entire routers with Router::layer and Router::route_layer.
+To method routers with MethodRouter::layer and MethodRouter::route_layer.
+To individual handlers with Handler::layer.
+
+
