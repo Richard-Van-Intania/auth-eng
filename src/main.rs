@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use axum::{
-    extract::Path,
+    extract::{Path, Query},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -9,7 +11,8 @@ use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Row};
 
-const DATABASE_URL: &'static str = "postgres://postgres:mysecretpassword@localhost/testuser";
+const DATABASE_URL: &'static str =
+    "postgres://postgres:mysecretpassword@localhost:5432/app789plates";
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +26,10 @@ async fn main() {
         .route("/testdb", get(test_db_connect))
         .route("/testdbticket", get(test_db_connect_ticket))
         .route("/dataticket/:user_id", post(data_ticket))
-        .route("/dataticketone/:user_id", get(data_ticket_one))
+        .route("/dataticketone/:user_id", post(data_ticket_one))
+        .route("/testjson", get(test_json))
+        .route("/testquery", get(test_query))
+        .route("/testpath/:user_id", get(test_path))
         .layer(Extension(pool));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -92,8 +98,28 @@ async fn data_ticket(
 
 async fn data_ticket_one(
     Extension(pool): Extension<PgPool>,
-    Path(user_id): Path<u32>,
+    Path(user_id): Path<usize>,
 ) -> impl IntoResponse {
+    // let ticket = sqlx::query_as::<_, Ticket>("SELECT * FROM public.ticket WHERE id = ?")
+    //     .bind(user_id)
+    //     .fetch_one(&pool)
+    //     .await
+    //     .expect("Failed to fetch data from the database");
+    // ticket.name
+}
+async fn test_path(Path(user_id): Path<u32>) -> String {
+    user_id.to_string()
+}
+
+async fn test_query(Query(params): Query<HashMap<String, String>>) {
+    println!("{}", params.len());
+}
+
+async fn test_json() -> Json<Ticket> {
+    Json(Ticket {
+        id: 10,
+        name: "mytest".to_string(),
+    })
 }
 
 // StatusCode::OK
