@@ -83,7 +83,7 @@ async fn post_health() -> StatusCode {
     StatusCode::OK
 }
 
-async fn test_db_connect(Extension(pool): Extension<PgPool>) -> impl IntoResponse {
+async fn test_db_connect() -> impl IntoResponse {
     let rows = sqlx::query("SELECT * FROM public.users")
         .execute(&pool)
         .await

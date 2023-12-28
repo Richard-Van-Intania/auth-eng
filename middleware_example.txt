@@ -1,15 +1,22 @@
 use axum::{
-    extract::Request,
+    extract::{Request, State},
     handler::Handler,
+    http::StatusCode,
     middleware::{self, Next},
     response::Response,
     routing::get,
     Router,
 };
 use chrono::Local;
+use sqlx::PgPool;
+use std::time::Duration;
+use tower_http::timeout::TimeoutLayer;
 
 #[tokio::main]
 async fn main() {
+    let pool = PgPool::connect("postgres://postgres:mysecretpassword@localhost:5432/app789plates")
+        .await
+        .expect("Failed to connect to database");
     let app = Router::new()
         .route(
             "/individual",
@@ -33,7 +40,13 @@ async fn main() {
         )
         .route("/health", get(get_health))
         .route_layer(middleware::from_fn(correct_route_middleware)) // the middleware will only run if the request matches a route but wrong method stil run
-        .layer(middleware::from_fn(all_middleware)); // run all event wrong route or method
+        .layer(middleware::from_fn(all_middleware)) // run all event wrong route or method
+        .route_layer(middleware::from_fn_with_state(
+            pool.clone(),
+            all_middleware_with_state,
+        ))
+        .layer(TimeoutLayer::new(Duration::from_secs(30)))
+        .with_state(pool);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -65,7 +78,13 @@ async fn post_bar() {}
 async fn put_bar() {}
 async fn delete_bar() {}
 
-async fn get_health() {}
+async fn get_health(State(pool): State<PgPool>) -> StatusCode {
+    let rows = sqlx::query("SELECT * FROM public.users")
+        .execute(&pool)
+        .await
+        .expect("Failed to fetch data from the database");
+    StatusCode::OK
+}
 
 async fn foo_middleware(request: Request, next: Next) -> Response {
     // do something with `request`...
@@ -107,6 +126,42 @@ async fn correct_route_middleware(request: Request, next: Next) -> Response {
 
     // do something with `response`...
     println!("hello from correct_route_middleware at {}", Local::now());
+
+    response
+}
+
+async fn all_middleware_with_state(
+    State(pool): State<PgPool>,
+    request: Request,
+    next: Next,
+) -> Response {
+    // do something with `request`...
+    let rows = sqlx::query("SELECT * FROM public.users")
+        .execute(&pool)
+        .await
+        .expect("Failed to fetch data from the database");
+
+    let response = next.run(request).await;
+
+    // do something with `response`...
+    println!("hello from all_middleware_with_state at {}", Local::now());
+
+    response
+}
+
+async fn my_middleware(
+    State(pool): State<PgPool>,
+    // you can add more extractors here but the last
+    // extractor must implement `FromRequest` which
+    // `Request` does
+    request: Request,
+    next: Next,
+) -> Response {
+    // do something with `request`...
+
+    let response = next.run(request).await;
+
+    // do something with `response`...
 
     response
 }
