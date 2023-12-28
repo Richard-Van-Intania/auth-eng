@@ -1,13 +1,4 @@
-use axum::{
-    extract::{Request, State},
-    handler::Handler,
-    http::StatusCode,
-    middleware::{self, Next},
-    response::Response,
-    routing::get,
-    Router,
-};
-use chrono::Local;
+use axum::{extract::State, http::StatusCode, routing::get, Router};
 use sqlx::PgPool;
 use std::time::Duration;
 use tower_http::timeout::TimeoutLayer;
@@ -18,150 +9,19 @@ async fn main() {
         .await
         .expect("Failed to connect to database");
     let app = Router::new()
-        .route(
-            "/individual",
-            get(get_individual.layer(middleware::from_fn(individual_middleware))), // apply middleware to individual handler
-        )
-        .route(
-            "/foo",
-            get(get_foo)
-                .post(post_foo)
-                .layer(middleware::from_fn(foo_middleware))
-                .put(put_foo)
-                .delete(delete_foo), // get and post will have foo_middleware, put and delete will not have
-        )
-        .route(
-            "/bar",
-            get(get_bar)
-                .post(post_bar)
-                .put(put_bar)
-                .delete(delete_bar)
-                .route_layer(middleware::from_fn(bar_middleware)), // all method will have bar_middleware
-        )
         .route("/health", get(get_health))
-        .route_layer(middleware::from_fn(correct_route_middleware)) // the middleware will only run if the request matches a route but wrong method stil run
-        .layer(middleware::from_fn(all_middleware)) // run all event wrong route or method
-        .route_layer(middleware::from_fn_with_state(
-            pool.clone(),
-            all_middleware_with_state,
-        ))
         .layer(TimeoutLayer::new(Duration::from_secs(30)))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
-// middleware order right to left, bottom to top
-// layer run all event wrong route or method
-// route_layer run only match route(wrong method stil run)
-
-async fn individual_middleware(request: Request, next: Next) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from individual_middleware at {}", Local::now());
-
-    response
-}
-
-async fn get_individual() {}
-
-async fn get_foo() {}
-async fn post_foo() {}
-async fn put_foo() {}
-async fn delete_foo() {}
-
-async fn get_bar() {}
-async fn post_bar() {}
-async fn put_bar() {}
-async fn delete_bar() {}
-
 async fn get_health(State(pool): State<PgPool>) -> StatusCode {
     let rows = sqlx::query("SELECT * FROM public.users")
         .execute(&pool)
-        .await
-        .expect("Failed to fetch data from the database");
-    StatusCode::OK
-}
-
-async fn foo_middleware(request: Request, next: Next) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from foo_middleware at {}", Local::now());
-
-    response
-}
-
-async fn bar_middleware(request: Request, next: Next) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from bar_middleware at {}", Local::now());
-
-    response
-}
-
-async fn all_middleware(request: Request, next: Next) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from all_middleware at {}", Local::now());
-
-    response
-}
-
-async fn correct_route_middleware(request: Request, next: Next) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from correct_route_middleware at {}", Local::now());
-
-    response
-}
-
-async fn all_middleware_with_state(
-    State(pool): State<PgPool>,
-    request: Request,
-    next: Next,
-) -> Response {
-    // do something with `request`...
-    let rows = sqlx::query("SELECT * FROM public.users")
-        .execute(&pool)
-        .await
-        .expect("Failed to fetch data from the database");
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-    println!("hello from all_middleware_with_state at {}", Local::now());
-
-    response
-}
-
-async fn my_middleware(
-    State(pool): State<PgPool>,
-    // you can add more extractors here but the last
-    // extractor must implement `FromRequest` which
-    // `Request` does
-    request: Request,
-    next: Next,
-) -> Response {
-    // do something with `request`...
-
-    let response = next.run(request).await;
-
-    // do something with `response`...
-
-    response
+        .await;
+    match rows {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }

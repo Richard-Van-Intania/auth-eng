@@ -1,7 +1,7 @@
 use axum::{
     extract::{Request, State},
     handler::Handler,
-    http::StatusCode,
+    http::{self, StatusCode},
     middleware::{self, Next},
     response::Response,
     routing::get,
@@ -164,4 +164,46 @@ async fn my_middleware(
     // do something with `response`...
 
     response
+}
+
+#[derive(Clone)]
+struct CurrentUser {
+    email: String,
+    password: String,
+}
+
+async fn auth(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+    let auth_header = req
+        .headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|header| header.to_str().ok());
+
+    let auth_header = if let Some(auth_header) = auth_header {
+        auth_header
+    } else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    if let Some(current_user) = authorize_current_user(auth_header).await {
+        // insert the current user into a request extension so the handler can
+        // extract it
+        req.extensions_mut().insert(current_user);
+        Ok(next.run(req).await)
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+async fn authorize_current_user(auth_token: &str) -> Option<CurrentUser> {
+    Some(CurrentUser {
+        email: "xxx".to_string(),
+        password: "xxx".to_string(),
+    })
+}
+
+async fn handler(
+    // extract the current user, set by the middleware
+    // Extension(current_user): Extension<CurrentUser>,
+    State(current_user): State<CurrentUser>,
+) {
 }
