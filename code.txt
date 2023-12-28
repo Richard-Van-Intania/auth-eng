@@ -14,3 +14,10 @@ To method routers with MethodRouter::layer and MethodRouter::route_layer.
 To individual handlers with Handler::layer.
 
 How to make state available to middleware depends on how the middleware is written.
+
+
+.execute(&pool)
+.fetch(&pool)
+.fetch_one(&pool)
+.fetch_all(&pool)
+.fetch_optional(&pool)
