@@ -21,3 +21,7 @@ How to make state available to middleware depends on how the middleware is writt
 .fetch_one(&pool)
 .fetch_all(&pool)
 .fetch_optional(&pool)
+
+
+   let utc: DateTime<Utc> = Utc::now() + Duration::hours(3);
+    let local: DateTime<Local> = Local::now() + Duration::hours(3);
