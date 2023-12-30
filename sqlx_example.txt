@@ -9,9 +9,13 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use chrono::{DateTime, Duration, Utc};
+use lettre::message::header::ContentType;
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
+use rand::random;
 use serde::Deserialize;
 use sqlx::{FromRow, PgPool};
-use std::time::Duration;
 use tower_http::timeout::TimeoutLayer;
 use uuid::Uuid;
 
@@ -27,7 +31,11 @@ async fn main() {
         .route("/adduser", post(post_test_query))
         .route("/deleteallusers", delete(delete_all_users))
         .route("/checkexisting", post(post_check_existing))
-        .layer(TimeoutLayer::new(Duration::from_secs(30)))
+        .route("/testemail", get(get_test_email))
+        .route("/testverification", post(post_test_verification))
+        .route("/testexecute", get(get_test_execute))
+        .route("/testhash", get(get_test_hash))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(30)))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -121,6 +129,84 @@ async fn post_check_existing(
         Ok(_) => "already taken",
         Err(_) => "available",
     }
+}
+
+async fn get_test_email() -> StatusCode {
+    let email = Message::builder()
+        .from("<pu.van.intania@gmail.com>".parse().unwrap())
+        .to("<lillpu@live.com>".parse().unwrap())
+        .subject("Happy new year")
+        .header(ContentType::TEXT_PLAIN)
+        .body(String::from("Be happy!"))
+        .unwrap();
+
+    let creds = Credentials::new(
+        "pu.van.intania@gmail.com".to_owned(),
+        "cbvt zpjr vuxl tjdq".to_owned(),
+    );
+
+    // Open a remote connection to gmail
+    let mailer = SmtpTransport::relay("smtp.gmail.com")
+        .unwrap()
+        .credentials(creds)
+        .build();
+
+    // Send the email
+    match mailer.send(&email) {
+        Ok(_) => StatusCode::OK,
+        Err(e) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+async fn post_test_verification(State(pool): State<PgPool>, body: String) -> impl IntoResponse {
+    let code0: u8 = random();
+    let code1: u8 = random();
+    let code2: u8 = random();
+    let code = format!("{}{}{}", code0, code1, code2);
+    let hash = blake3::hash(code.as_bytes());
+    let utc: DateTime<Utc> = Utc::now() + Duration::minutes(10);
+    let row: Result<(String, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
+        "
+        INSERT INTO public.verification (user_uuid, verification_code, valid_before)
+        VALUES ($1, $2, $3) 
+        RETURNING verification_code, valid_before
+        ",
+    )
+    .bind(body)
+    .bind(hash.to_string())
+    .bind(utc)
+    .fetch_one(&pool)
+    .await;
+
+    let dt: DateTime<Utc> = Utc::now();
+
+    match row {
+        Ok(code) => {
+            if dt < code.1 {
+                "before".to_string()
+            } else {
+                "after".to_string()
+            }
+        }
+        Err(error) => error.to_string(),
+    }
+}
+
+async fn get_test_execute(State(pool): State<PgPool>) -> impl IntoResponse {
+    let result = sqlx::query("SELECT * FROM public.verification")
+        .execute(&pool)
+        .await;
+    match result {
+        Ok(_) => "ok".to_string(),
+        Err(e) => e.to_string(),
+    }
+}
+
+async fn test() {}
+
+async fn get_test_hash(body: String) -> impl IntoResponse {
+    let hash1 = blake3::hash(body.as_bytes());
+    hash1.to_string()
 }
 
 #[derive(FromRow, Deserialize)]
