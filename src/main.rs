@@ -34,6 +34,7 @@ async fn main() {
         .route("/testemail", get(get_test_email))
         .route("/testverification", post(post_test_verification))
         .route("/testexecute", get(get_test_execute))
+        .route("/testhash", get(get_test_hash))
         .layer(TimeoutLayer::new(std::time::Duration::from_secs(30)))
         .with_state(pool);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -169,7 +170,7 @@ async fn post_test_verification(State(pool): State<PgPool>, body: String) -> imp
         VALUES ($1, $2, $3)
         ON CONFLICT (user_uuid)
         DO UPDATE SET verification_code = EXCLUDED.verification_code, valid_before = EXCLUDED.valid_before 
-        RETURNING verification_code, valid_before
+        RETURNING verification_code, valid_before;
         ",
     )
     .bind(body)
@@ -200,6 +201,13 @@ async fn get_test_execute(State(pool): State<PgPool>) -> impl IntoResponse {
         Ok(_) => "ok".to_string(),
         Err(e) => e.to_string(),
     }
+}
+
+async fn test() {}
+
+async fn get_test_hash(body: String) -> impl IntoResponse {
+    let hash1 = blake3::hash(body.as_bytes());
+    hash1.to_string()
 }
 
 #[derive(FromRow, Deserialize)]
