@@ -163,14 +163,12 @@ async fn post_test_verification(State(pool): State<PgPool>, body: String) -> imp
     let code1: u8 = random();
     let code2: u8 = random();
     let code = format!("{}{}{}", code0, code1, code2);
-    let utc: DateTime<Utc> = Utc::now() + Duration::minutes(15);
+    let utc: DateTime<Utc> = Utc::now() + Duration::minutes(10);
     let row: Result<(String, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
         "
         INSERT INTO public.verification (user_uuid, verification_code, valid_before)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_uuid)
-        DO UPDATE SET verification_code = EXCLUDED.verification_code, valid_before = EXCLUDED.valid_before 
-        RETURNING verification_code, valid_before;
+        VALUES ($1, $2, $3) 
+        RETURNING verification_code, valid_before
         ",
     )
     .bind(body)
