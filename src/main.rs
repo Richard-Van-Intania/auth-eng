@@ -163,6 +163,7 @@ async fn post_test_verification(State(pool): State<PgPool>, body: String) -> imp
     let code1: u8 = random();
     let code2: u8 = random();
     let code = format!("{}{}{}", code0, code1, code2);
+    let hash = blake3::hash(code.as_bytes());
     let utc: DateTime<Utc> = Utc::now() + Duration::minutes(10);
     let row: Result<(String, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
         "
@@ -172,7 +173,7 @@ async fn post_test_verification(State(pool): State<PgPool>, body: String) -> imp
         ",
     )
     .bind(body)
-    .bind(code)
+    .bind(hash.to_string())
     .bind(utc)
     .fetch_one(&pool)
     .await;
