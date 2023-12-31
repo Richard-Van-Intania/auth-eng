@@ -1,0 +1,23 @@
+use axum::{routing::get, Router};
+use sqlx::PgPool;
+use tokio::spawn;
+use tokio_schedule::{every, Job};
+
+#[tokio::main]
+async fn main() {
+    let delete_task = every(1).hour().perform(|| async {
+        let pool =
+            PgPool::connect("postgres://postgres:mysecretpassword@localhost:5432/app789plates")
+                .await
+                .expect("Failed to connect to database");
+        let _ = sqlx::query("SELECT * FROM public.users")
+            .execute(&pool)
+            .await;
+    });
+    spawn(delete_task);
+    let app = Router::new().route("/health", get(|| async {}));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn test() {}
