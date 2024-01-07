@@ -1,6 +1,6 @@
-use axum::{extract::State, response::IntoResponse, routing::get, Router};
+use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use elasticsearch::{Elasticsearch, SearchParts};
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[tokio::main]
 async fn main() {
@@ -8,12 +8,17 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(|| async {}))
         .route("/testelasticsearch", get(test_elasticsearch))
+        .route("/testejson", get(test_json))
         .with_state(client);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
 async fn test() {}
+
+async fn test_json() -> Json<Value> {
+    Json(json!({ "data": 42 }))
+}
 
 async fn test_elasticsearch(State(client): State<Elasticsearch>) -> impl IntoResponse {
     let response = client
