@@ -1,6 +1,9 @@
-use std::{fs::File, io::Read};
-
-use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    extract::{Query, State},
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use elasticsearch::{
     auth::Credentials,
     cert::{Certificate, CertificateValidation},
@@ -11,12 +14,13 @@ use elasticsearch::{
     Elasticsearch, SearchParts,
 };
 use serde_json::{json, Value};
+use std::{collections::HashMap, fs::File, io::Read};
 
 #[tokio::main]
 async fn main() {
-    let credentials = Credentials::Basic("elastic".into(), "Yxp=9DLAR_kXWedXdejI".into());
     let url = Url::parse("https://localhost:9200").unwrap();
-    let conn_pool = SingleNodeConnectionPool::new(url);
+    let pool = SingleNodeConnectionPool::new(url);
+    let credentials = Credentials::Basic("elastic".into(), "Yxp=9DLAR_kXWedXdejI".into());
     let mut buf = Vec::new();
     File::open("http_ca.crt")
         .unwrap()
@@ -24,7 +28,7 @@ async fn main() {
         .unwrap();
     let certificate = Certificate::from_pem(&buf).unwrap();
     let validation: CertificateValidation = CertificateValidation::Full(certificate);
-    let transport = TransportBuilder::new(conn_pool)
+    let transport = TransportBuilder::new(pool)
         .auth(credentials)
         .cert_validation(validation)
         .build()
@@ -45,7 +49,11 @@ async fn test_json() -> Json<Value> {
     Json(json!({ "data": 42 }))
 }
 
-async fn test_elasticsearch(State(client): State<Elasticsearch>) -> impl IntoResponse {
+async fn test_elasticsearch(
+    Query(params): Query<HashMap<String, String>>,
+    State(client): State<Elasticsearch>,
+) -> impl IntoResponse {
+    let search = params.get("search").unwrap();
     let response = client
         .search(SearchParts::Index(&["dbdrev1"]))
         .from(0)
@@ -53,7 +61,7 @@ async fn test_elasticsearch(State(client): State<Elasticsearch>) -> impl IntoRes
         .body(json!({
             "query": {
                 "match": {
-                    "legal_entity_registration_number": "0107535000206"
+                    "legal_entity_registration_number": search
                 }
             }
         }))
