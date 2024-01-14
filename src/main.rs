@@ -20,16 +20,13 @@ use std::{collections::HashMap, fs::File, io::Read};
 async fn main() {
     let url = Url::parse("https://localhost:9200").unwrap();
     let pool = SingleNodeConnectionPool::new(url);
-
     let credentials = Credentials::Basic("elastic".into(), "Yxp=9DLAR_kXWedXdejI".into());
-
     let mut buf = Vec::new();
     File::open("http_ca.crt")
         .unwrap()
         .read_to_end(&mut buf)
         .unwrap();
     let certificate = Certificate::from_pem(&buf).unwrap();
-
     let validation: CertificateValidation = CertificateValidation::Full(certificate);
     let transport = TransportBuilder::new(pool)
         .auth(credentials)
